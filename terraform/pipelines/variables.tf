@@ -10,6 +10,11 @@ variable "eks_cluster_name" {
   default     = "aws-devsecops-cluster"
 }
 
+variable "codebuild_project_name" {
+  type    = string
+  default = "aws-devsecops-pipeline" # adapte au nom de ton projet CodeBuild
+}
+
 variable "region" {
   type        = string
   description = "AWS Region"
@@ -18,3 +23,15 @@ variable "region" {
 
 variable "SNYK_TOKEN" {}
 variable "SNYK_ORG_ID" {}
+
+variable "alert_email" {
+  type        = string
+  description = "Email à notifier via SNS"
+}
+
+variable "slack_webhook_url" {
+  type        = string
+  sensitive   = true
+  description = "Webhook Slack pour recevoir les notifications"
+
+}
