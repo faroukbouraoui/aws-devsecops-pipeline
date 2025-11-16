@@ -1,7 +1,11 @@
 # Create the EKS Cluster
 resource "aws_eks_cluster" "this" {
   name     = var.cluster_name
+<<<<<<< HEAD
   version  = "1.33"
+=======
+  version  = "1.29"
+>>>>>>> ecac0a6 (changes)
   role_arn = aws_iam_role.eks_cluster_role.arn
 
   vpc_config {
