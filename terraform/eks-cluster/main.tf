@@ -1,6 +1,6 @@
 # Default Networking Configuration
 resource "aws_default_subnet" "default_subnet_a" {
-  id=
+
   availability_zone = "${var.region}a"
 }
 
