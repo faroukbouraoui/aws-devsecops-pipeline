@@ -1,3 +1,5 @@
+resource "aws_default_vpc" "default" {}
+
 # Default Networking Configuration
 resource "aws_default_subnet" "default_subnet_a" {
 
