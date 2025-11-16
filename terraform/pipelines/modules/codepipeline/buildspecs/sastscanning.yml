@@ -8,7 +8,7 @@ phases:
     commands:
       - echo "Installing Snyk CLI..."
       - npm install -g snyk
-      - snyk auth ${SNYK_TOKEN}  # Authenticate using the Snyk token
+      - snyk auth ${SNYK_TOKEN}
   pre_build:
     commands:
       - echo "Installing dependencies..."
@@ -17,11 +17,25 @@ phases:
   build:
     commands:
       - echo "Preparing for Snyk dependency scanning..."
-      # Fail the build if high or critical vulnerabilities are found
-      - snyk test --file=requirements.txt --severity-threshold=high
-      - echo "Running Snyk code security checks..."
-      # Fail the build if high or critical code vulnerabilities are found
-      - snyk code test --severity-threshold=high || true
+      # On capture l'état du test dans une variable FAILED
+      - |
+        FAILED=0
+
+        echo "Running Snyk dependency scan..."
+        snyk test --file=requirements.txt --severity-threshold=high || FAILED=1
+
+        echo "Running Snyk code security checks..."
+        snyk code test --severity-threshold=high || true
+
+        if [ "$FAILED" -ne 0 ]; then
+          echo "Snyk found high/critical vulnerabilities, sending notification..."
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+              --data "{\"text\":\"🚨 CodeBuild FAILED in project *$CODEBUILD_PROJECT_NAME* (build: $CODEBUILD_BUILD_ID). Snyk found high/critical vulnerabilities.\"}" \
+              "$SLACK_WEBHOOK_URL"
+          fi
+          exit 1
+        fi
   post_build:
     commands:
       - echo "Snyk scanning completed."
