@@ -60,3 +60,23 @@ module "awsome_fastapi_pipeline" {
   snyk_org_id = var.SNYK_ORG_ID
   snyk_token  = var.SNYK_TOKEN
 }
+
+module "sns_notifications" {
+  source      = "./modules/sns_notifications"
+  topic_name  = "codebuild-failures"
+  alert_email = var.alert_email
+}
+
+module "lambda_slack_notifier" {
+  source            = "./modules/lambda_slack_notifier"
+  function_name     = "codebuild-slack-notifier"
+  slack_webhook_url = var.slack_webhook_url
+  sns_topic_arn     = module.sns_notifications.topic_arn
+}
+
+module "eventbridge_codebuild_failed" {
+  source               = "./modules/eventbridge_codebuild_failed"
+  rule_name            = "codebuild-build-failed"
+  codebuild_project_name = var.codebuild_project_name
+  sns_topic_arn        = module.sns_notifications.topic_arn
+}
