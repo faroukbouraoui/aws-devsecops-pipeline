@@ -4,10 +4,10 @@ provider "aws" {
 
 terraform {
   cloud {
-    organization = "DSB"
+    organization = "farouk"
 
     workspaces {
-      name = "aws-devsecops-eks-cluster"
+      name = "dbs-aws-devsecops-eks-cluster"
     }
   }
 }
