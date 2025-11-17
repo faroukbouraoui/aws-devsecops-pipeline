@@ -12,7 +12,7 @@ variable "eks_cluster_name" {
 
 variable "codebuild_project_name" {
   type    = string
-  default = "${var.repo_name}-static-analysis-project" # adapte au nom de ton projet CodeBuild
+  default = "awsome-fastapi-static-analysis-project" # adapte au nom de ton projet CodeBuild
 }
 
 variable "region" {
