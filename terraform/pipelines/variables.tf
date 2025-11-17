@@ -12,7 +12,7 @@ variable "eks_cluster_name" {
 
 variable "codebuild_project_name" {
   type    = string
-  default = "aws-devsecops-pipeline" # adapte au nom de ton projet CodeBuild
+  default = "${var.repo_name}-static-analysis-project" # adapte au nom de ton projet CodeBuild
 }
 
 variable "region" {
@@ -32,6 +32,6 @@ variable "alert_email" {
 variable "slack_webhook_url" {
   type        = string
   sensitive   = true
-  description = "Webhook Slack pour recevoir les notifications"
+  description = "Webhook Slack pour recevoir les notificationss"
 
 }
