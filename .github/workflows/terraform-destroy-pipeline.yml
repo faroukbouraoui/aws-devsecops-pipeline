@@ -1,7 +1,12 @@
 name: "Terraform Destroy"
 
 on:
-  workflow_call:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DESTROY to confirm destroying the workspace"
+        required: true
+        default: "NO"
 
 env:
   TF_CLOUD_ORGANIZATION: "farouk"
@@ -15,8 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    # 👇 only run when the caller workflow is on main
-    if: ${{ github.ref == 'refs/heads/main' }}
+    # only run on main AND if user typed DESTROY
+    if: ${{ github.ref == 'refs/heads/main' && github.event.inputs.confirm == 'DESTROY' }}
 
     steps:
       - name: Checkout
@@ -42,4 +47,4 @@ jobs:
         id: destroy-apply
         with:
           run: ${{ steps.destroy-run.outputs.run_id }}
-          comment: "Destroy Run from GitHub Actions CI ${{ github.sha }}"
+          comment: "Manual Destroy Run from GitHub Actions CI ${{ github.sha }}"
