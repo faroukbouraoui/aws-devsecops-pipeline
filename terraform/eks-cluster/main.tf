@@ -9,7 +9,7 @@ resource "aws_default_subnet" "default_subnet_a" {
 resource "aws_default_subnet" "default_subnet_b" {
   availability_zone = "${var.region}b"
 }
-
+# this is will be for the commit 
 # EKS Cluster
 module "default_cluster" {
   source       = "./modules/eks"
