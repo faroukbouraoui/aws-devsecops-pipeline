@@ -1,0 +1,36 @@
+@startuml
+autonumber
+
+participant GHA as "CodeBuild Deploy Job\nou kubectl local"
+participant EKS_API as "EKS Control Plane\n(API server)"
+participant Scheduler as "Scheduler EKS"
+participant Node as "Node Group EKS\nEC2 t3.medium"
+participant Kubelet as "kubelet + CNI"
+participant ECR as "ECR\nawsome-fastapi"
+participant SVC as "Service LoadBalancer\nawsome-fastapi"
+participant LB as "AWS Load Balancer"
+actor User as "Client HTTP"
+
+GHA ->> EKS_API: aws eks update-kubeconfig
+GHA ->> EKS_API: kubectl apply -f k8s-deployment.yaml\n(Deployment + Service)
+
+EKS_API ->> Scheduler: Nouveaux Pods Pending
+Scheduler ->> Node: Sélectionne un nœud
+Node ->> Kubelet: Demande création de Pod
+
+Kubelet ->> ECR: pull image awsome-fastapi:latest
+ECR --> Kubelet: Image conteneur
+Kubelet -> Kubelet: Démarrage container FastAPI\navec probes liveness/readiness
+Kubelet --> EKS_API: Pod Running / Ready
+
+EKS_API ->> SVC: Création du Service\n(type LoadBalancer)
+SVC ->> LB: Provisionnement Load Balancer public
+LB --> SVC: IP / DNS public
+
+User ->> LB: HTTP GET /
+LB ->> SVC: Routage vers Service awsome-fastapi
+SVC ->> Node: Redirection vers Pod sur un nœud
+Node ->> Kubelet: Requête dans le conteneur
+Kubelet --> User: Réponse HTTP 200 OK
+
+@enduml

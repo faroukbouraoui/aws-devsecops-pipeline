@@ -1,0 +1,64 @@
+@startuml
+autonumber
+
+actor Dev as "DevOps Engineer"
+participant GH as "GitHub\n(repo)"
+participant GHA as "GitHub Actions\n(Workflows)"
+participant TFC as "Terraform Cloud"
+participant WS_EKS as "Workspace\n dsb-aws-devsecops-eks-cluster"
+participant WS_PIPE as "Workspace\n dsb-aws-devsecops-pipelines"
+participant AWS as "AWS APIs\n(IAM, VPC, EKS, CodePipeline...)"
+
+Dev ->> GH: git push origin main
+GH ->> GHA: Déclenchement workflow CI\non: push (main)
+
+note over GHA
+Job 1 (optionnel)\nLint/Format Terraform
+end note
+
+GHA -> GHA: terraform fmt -check
+
+group Job terraform-apply-eks
+  note over GHA, TFC
+  Provisionnement du cluster EKS
+  end note
+
+  GHA -> GHA: Checkout repo (actions/checkout)
+  GHA -> TFC: upload-configuration\n./terraform/eks-cluster\nworkspace = dsb-aws-devsecops-eks-cluster
+  TFC --> GHA: configuration_version_id
+
+  GHA -> TFC: create-run (apply-run)\navec TF_API_TOKEN (secret GitHub)
+  TFC -> WS_EKS: Crée un run (plan)
+  WS_EKS -> AWS: Appels API via provider AWS
+  AWS --> WS_EKS: Résultat du plan (diff)
+
+  WS_EKS --> TFC: Run avec actions.IsConfirmable = true
+  GHA -> TFC: apply-run si IsConfirmable = true
+  TFC -> WS_EKS: Application du plan
+  WS_EKS -> AWS: Création / MAJ VPC, EKS, IAM...
+  AWS --> WS_EKS: Ressources créées / mises à jour
+end
+
+group Job terraform-apply-pipelines (dépend de terraform-apply-eks)
+  note over GHA, TFC
+  Provisionnement des pipelines DevSecOps
+  end note
+
+  GHA -> TFC: upload-configuration\n./terraform/pipelines\nworkspace = dsb-aws-devsecops-pipelines
+  TFC --> GHA: configuration_version_id
+
+  GHA -> TFC: create-run
+  TFC -> WS_PIPE: Crée un run (plan)
+  WS_PIPE -> AWS: Appels API AWS\n(CodePipeline, CodeBuild, ECR, S3, EventBridge, SNS, Lambda…)
+  AWS --> WS_PIPE: Plan de changements
+
+  WS_PIPE --> TFC: Run confirmable
+  GHA -> TFC: apply-run
+  TFC -> WS_PIPE: Applique le plan
+  WS_PIPE -> AWS: Création pipeline, projets CodeBuild,\nECR, S3, EventBridge, SNS, Lambda...
+  AWS --> WS_PIPE: Infra DevSecOps provisionnée
+end
+
+AWS --> Dev: EKS + Pipelines prêts
+
+@enduml

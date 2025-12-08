@@ -1,0 +1,76 @@
+@startuml
+' -------- Style lisible pour rapport --------
+skinparam backgroundColor white
+skinparam defaultFontName Arial
+skinparam defaultFontSize 14
+skinparam Shadowing false
+skinparam dpi 150
+
+skinparam sequence {
+  ArrowColor black
+  ArrowThickness 1.5
+  LifeLineBorderColor black
+  LifeLineBackgroundColor white
+  ParticipantBorderColor black
+  ParticipantBackgroundColor white
+}
+
+title Pipeline CI/CD DevSecOps sur AWS\nSéquence - CodePipeline / CodeBuild / Snyk / Trivy / Notifications
+
+autonumber
+
+actor Dev as "DevOps Engineer"
+participant GH as "GitHub\nawsome-fastapi"
+participant CP as "AWS CodePipeline"
+participant CB as "AWS CodeBuild"
+participant Snyk as "Snyk\nStatic Analysis"
+participant Trivy as "Trivy\nContainer Scan"
+participant ECR as "Amazon ECR"
+participant EKS as "Amazon EKS"
+participant EB as "Amazon EventBridge"
+participant SNS as "Amazon SNS\ncodebuild-failures"
+participant Lambda as "Lambda\ncodebuild-slack-notifier"
+participant Slack as "Slack"
+
+Dev -> GH : push sur branche main
+GH -> CP : Webhook via CodeStarSourceConnection\n(Source stage démarrée)
+
+CP -> CB : Démarrer build\nawsome-fastapi-build-project
+CB -> ECR : Push image Docker\nawsome-fastapi:latest
+CB --> CP : BuildArtifact (k8s-deployment.yaml)
+
+CP -> CB : FormatCheck\nawsome-fastapi-formatcheck-project
+CB --> CP : Résultat format (OK/KO)
+
+CP -> CB : LintCheck\nawsome-fastapi-lintcheck-project
+CB --> CP : Résultat lint (OK/KO)
+
+CP -> CB : RunUnitTests\nawsome-fastapi-unittest-project
+CB --> CP : coverage.xml + statut tests
+
+CP -> CB : SnykSecurityScan\nawsome-fastapi-static-analysis-project
+CB -> Snyk : Analyse dépendances & code
+Snyk --> CB : Résultat (vulnérabilités HIGH/CRITICAL ?)
+
+alt Snyk FAIL (vulnérabilités trouvées)
+  CB --> CP : Statut FAILED (static analysis)
+  CP --> EB : Événement CodeBuild Build State Change\nstatus=FAILED, project=static-analysis
+  EB -> SNS : Publie message sur codebuild-failures
+  SNS -> Lambda : Invocation Lambda (subscription)
+  Lambda -> Slack : POST message via webhook\n"Alerte build échoué (Snyk)"
+  SNS -> Dev : Email (si abonnement confirmé)
+  CP --> Dev : Pipeline arrêté
+else Snyk OK
+  CP -> CB : ContainerSecurityScan\nawsome-fastapi-oss-scanning-project
+  CB -> Trivy : Scan image Docker
+  Trivy --> CB : Rapport vulnérabilités
+  CB --> CP : Statut scan container (ici log uniquement)
+  
+  CP -> CB : DeployToEKS\nawsome-fastapi-deploy-prj
+  CB -> EKS : kubectl apply k8s-deployment.yaml\n(cluster aws-devsecops-cluster)
+  EKS --> CB : Déploiement réussi
+  CB --> CP : Statut SUCCESS
+  CP --> Dev : Pipeline SUCCESS (nouvelle version déployée)
+end
+
+@enduml

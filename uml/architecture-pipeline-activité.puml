@@ -1,0 +1,42 @@
+@startuml
+start
+
+:Dev push sur main;
+:CodePipeline - Source stage;
+:SourceArtifact stocké dans S3;
+
+:Stage Build - CodeBuild build-project;
+if ("Build OK ?") then (Oui)
+  :Stage Test - FormatCheck & LintCheck;
+  if ("Format & Lint OK ?") then (Oui)
+    :RunUnitTests (pytest + coverage);
+    if ("Tests OK ?") then (Oui)
+      :SnykSecurityScan + ContainerSecurityScan;
+      if ("Snyk HIGH/CRITICAL ?") then (Oui)
+        :Static-analysis FAILED;
+        :EventBridge -> SNS -> Lambda -> Slack;
+        stop
+      else (Non)
+        :Tous les gates validés;
+        :Stage Deploy - deploy-prj;
+        :kubectl apply sur aws-devsecops-cluster;
+        :Pods déployés (image depuis ECR);
+        stop
+      endif
+    else (Non)
+      :Échec des tests unitaires;
+      :Pipeline STOP (logs CloudWatch);
+      stop
+    endif
+  else (Non)
+    :Échec format/lint;
+    :Pipeline STOP;
+    stop
+  endif
+else (Non)
+  :Échec du build Docker;
+  :Pipeline STOP;
+  stop
+endif
+
+@enduml

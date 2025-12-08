@@ -27,8 +27,8 @@ def lambda_handler(event, context):
                 msg = {}
 
             detail = msg.get("detail", {})
-            project  = detail.get("project-name", "unknown-project")
-            build_id = detail.get("build-id", "unknown-build")
+            project  = detail.get("project-name", "Devsecops-iteam")
+            build_id = detail.get("build-id", "Build for test image")
             status   = detail.get("build-status", "FAILED")
 
             text = f"🚨 CodeBuild *{status}* pour le projet *{project}*.\nBuild ID: `{build_id}`"

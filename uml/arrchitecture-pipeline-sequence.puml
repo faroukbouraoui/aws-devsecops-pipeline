@@ -1,0 +1,79 @@
+@startuml
+autonumber
+
+actor Dev as "DevOps Engineer"
+participant GH as "GitHub\nawsome-fastapi"
+participant CP as "AWS CodePipeline\nawsome-fastapi"
+participant S3 as "S3 Artifacts\naws-codepipeline-artifacts-..."
+participant CB_B as "CodeBuild\nbuild-project"
+participant CB_F as "CodeBuild\nformatcheck-project"
+participant CB_L as "CodeBuild\nlintcheck-project"
+participant CB_U as "CodeBuild\nunittest-project"
+participant CB_S as "CodeBuild\nstatic-analysis-project (Snyk)"
+participant CB_T as "CodeBuild\noss-scanning-project (Trivy)"
+participant ECR as "AWS ECR\nawsome-fastapi"
+participant CB_D as "CodeBuild\ndeploy-prj"
+participant EKS as "EKS Cluster\naws-devsecops-cluster"
+participant CW as "CloudWatch Logs"
+participant EV as "EventBridge\ncodebuild-build-failed"
+participant SNS as "SNS Topic\ncodebuild-failures"
+participant L as "Lambda\ncodebuild-slack-notifier"
+participant Slack as "Slack Channel"
+
+Dev ->> GH: push sur branche main
+GH ->> CP: Événement CodeStarSourceConnection
+
+CP ->> GH: Récupère le code\n(Source stage)
+CP ->> S3: Stocke SourceArtifact
+
+CP ->> CB_B: Lance build-project\n(Build stage)
+CB_B ->> CW: Écrit logs CodeBuild
+CB_B ->> ECR: Build Docker & push image
+CB_B ->> S3: Génère k8s-deployment.yaml\n(BuildArtifact)
+CB_B --> CP: Statut SUCCEEDED / FAILED
+
+alt Build FAILED
+  CP -> CP: Pipeline STOP
+else Build SUCCEEDED
+  par
+    CP ->> CB_F: Lance FormatCheck\n(Black)
+    CB_F ->> CW: Logs format
+    CB_F --> CP: Résultat
+  and
+    CP ->> CB_L: Lance LintCheck\n(Pylint)
+    CB_L ->> CW: Logs lint
+    CB_L --> CP: Résultat
+  end
+
+  CP ->> CB_U: Lance RunUnitTests
+  CB_U ->> S3: coverage.xml vers S3
+  CB_U ->> CW: Logs tests
+  CB_U --> CP: Résultat tests
+
+  CP ->> CB_S: Lance SnykSecurityScan
+  CP ->> CB_T: Lance ContainerSecurityScan\n(Trivy)
+
+  CB_S ->> CW: Logs Snyk\n(SSM Parameter Store pour token)
+  CB_T ->> CW: Logs Trivy
+  CB_S --> CP: Résultat (peut FAIL sur HIGH/CRITICAL)
+  CB_T --> CP: Résultat (actuellement exit-code 0)
+
+  alt Snyk ou tests FAIL
+    CP -> CP: Pipeline STOP
+  else Tous les checks OK
+    CP ->> CB_D: Lance deploy-prj\n(DeployToEKS)
+    CB_D ->> EKS: aws eks update-kubeconfig\nkubectl apply -f k8s-deployment.yaml
+    CB_D ->> CW: Logs déploiement
+    CB_D --> CP: Statut déploiement
+  end
+end
+
+group Surveiller les échecs de static-analysis-project
+  CB_S --> EV: Événement CodeBuild Build State Change\n(status=FAILED)
+  EV ->> SNS: Publie message\n(codebuild-failures)
+  SNS ->> L: Déclenche Lambda (subscription)
+  L ->> CW: Logs Lambda
+  L ->> Slack: Message formaté\n(projet, build, liens)
+end
+
+@enduml

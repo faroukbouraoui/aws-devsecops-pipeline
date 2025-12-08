@@ -1,0 +1,30 @@
+@startuml
+start
+
+:Déploiement lancé\n(CodeBuild Deploy ou kubectl);
+:kubectl apply\nDeployment + Service;
+:EKS enregistre les objets;
+
+:Scheduler détecte des Pods Pending;
+:Affectation des Pods aux nœuds du node group;
+:kubelet crée les Pods\net demande IPs au CNI;
+:Pull de l'image depuis ECR;
+:Démarrage des containers FastAPI\n+ probes liveness/readiness;
+
+if ("Pods Ready ?") then (Non)
+  :Attendre readiness;\nre-check;
+  repeat
+    :Vérifier l'état des Pods;
+  repeat while (Encours) is (Pods non Ready)
+else (Oui)
+  :Service type LoadBalancer créé;
+  :Provisionnement du Load Balancer AWS;
+  :IP/DNS public exposé;
+  :Client envoie des requêtes HTTP;
+  :LB route vers le Service;
+  :Service distribue vers les Pods;
+  :Pods traitent les requêtes\net renvoient les réponses;
+endif
+
+stop
+@enduml

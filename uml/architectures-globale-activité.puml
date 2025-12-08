@@ -1,0 +1,40 @@
+@startuml
+start
+
+:Développeur push sur main;
+:GitHub déclenche le workflow;
+
+:Job Lint/Format Terraform (optionnel);\nterraform fmt -check;
+if ("Lint OK ?") then (Oui)
+  :Job terraform-apply-eks;
+  :Upload config vers TFC\nworkspace EKS;
+  :TFC crée un run (plan);
+  :Provider AWS exécute le plan;
+  if ("Run confirmable ?") then (Oui)
+    :GitHub Actions appelle apply-run;
+    :TFC applique le plan\nCluster EKS + IAM créés;
+  else (Non)
+    :Run annulé / en attente de validation;
+    stop
+  endif
+
+  :Job terraform-apply-pipelines;
+  :Upload config vers TFC\nworkspace pipelines;
+  :TFC crée un run (plan) pipelines;
+  :Appels API AWS\n(CodePipeline, CodeBuild, ECR, S3...);
+  if ("Run confirmable ?") then (Oui)
+    :apply-run sur pipelines;
+    :Création/MAJ des pipelines DevSecOps;
+    :Infra CI/CD prête;
+    stop
+  else (Non)
+    :Run annulé / en attente de validation;
+    stop
+  endif
+
+else (Non)
+  :Échec du workflow CI;\nCorriger le code Terraform;
+  stop
+endif
+
+@enduml
